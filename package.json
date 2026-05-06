@@ -10,8 +10,17 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "amqplib": "^1.0.6",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "body-parser": "^2.2.2",
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "mysql": "^2.18.1"
+    "express-rate-limit": "^8.0.0",
+    "express-validator": "^7.3.2",
+    "http-proxy-middleware": "^3.0.5",
+    "jsonwebtoken": "^9.0.3",
+    "mysql": "^2.18.1",
+    "mysql2": "^3.22.3"
   }
 }
