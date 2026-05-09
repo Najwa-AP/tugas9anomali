@@ -3,6 +3,7 @@ import express from 'express';
 import mysql, { Connection } from 'mysql2';
 import config from './config.js';
 import { body, validationResult } from 'express-validator';
+import amqp from 'amqplib';
 
 const app = express();
 const port = config.port;
@@ -14,18 +15,30 @@ const db = mysql.createPool(config.db);
 
 // buat ambil data dari gateway
 const identifyUser = (req, res, next) => {
-    const userId = req.headers['x-user-id'];
-    const userRole = req.headers['x-user-role'];
-
-    if (!userId || !userRole) {
+    const userData = req.headers['x-user-data'];
+    
+    if (!userData) {
         return res.status(401).json({ 
             status: "error",
             message: "Akses ilegal. Silakan mengaksesnya lewat Gateway" 
         });
     }
 
-    req.user = { id: userId, role: userRole };
-    next();
+    try {
+        const user = JSON.parse(userData);
+        // save ke req.user biar bisa dipake di route GET, POST, PUT, DELETE
+        req.user = { 
+            id: user.id, 
+            role: user.role,
+            username: user.username 
+        };
+        next();
+    } catch (error) {
+        return res.status(400).json({
+            status: "error",
+            message: "Format data user tidak valid"
+        });
+    }
 };
 
 // buat validasi input dari user
@@ -50,8 +63,6 @@ app.get('/laporan', identifyUser, (req, res) => {
     let params = [];
 
     if (req.user.role !== 'admin') {
-        // Cari NIM mahasiswa berdasarkan user_id (karena di JWT cuma ada user_id)
-        // Atau kamu bisa modifikasi JWT agar bawa NIM juga biar lebih cepat
         query = "SELECT p.* FROM pengaduan p JOIN mahasiswa m ON p.nim_pelapor = m.nim WHERE m.user_id = ?";
         params = [req.user.id];
     }
@@ -65,7 +76,6 @@ app.get('/laporan', identifyUser, (req, res) => {
             });
         }
 
-        // Jika berhasil
         res.status(200).json({
             status: "success",
             message: "Data berhasil diambil",
@@ -166,13 +176,21 @@ app.put('/laporan/:id', [
     }
     const { status } = req.body; // pending, proses, selesai
     
-    db.query("UPDATE pengaduan SET status = ? WHERE id = ?", [status, req.params.id], (err) => {
+    db.query("UPDATE pengaduan SET status = ? WHERE id = ?", [status, req.params.id], (err, result) => {
         if (err) {
             return res.status(500).json({ 
                  status: "error",
                 message: "Database sedang bermasalah"  
             });
         }
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ 
+                status: "error",
+                message: "Laporan tidak ditemukan" 
+            });
+        }
+
         res.status(200).json({ 
             status: "success",
             message: "Status laporan berhasil diperbarui" 

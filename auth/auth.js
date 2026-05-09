@@ -24,7 +24,7 @@ const generateTokens = (user) => {
     const accessToken = jwt.sign(
         payload,
         process.env.JWT_ACCESS_SECRET,
-        { expiresIn: '15m' }
+        { expiresIn: '45m' }
     );
     const refreshToken = jwt.sign(
         payload,
@@ -34,13 +34,14 @@ const generateTokens = (user) => {
     return { accessToken, refreshToken };
 };
 
-db.connect((err) => {
+db.getConnection((err, connection) => {
     if (err) {
         console.error(
             "Gagal terhubung ke database, ", err.message);
             process.exit(1);
     }
     console.log("Berhasil terhubung ke database");
+    connection.release();
 });
 
 // buat validasi input
@@ -138,13 +139,67 @@ app.post('/register', [
 
                     // komit jika kedua query sukses
                     connection.commit((err) => {
-                        if (err) return connection.rollback(() => {});
+                        if (err) {
+                            return connection.rollback(() => {
+                                connection.release();
+                            });
+                        };
                         res.status(201).json({ 
                             status: "success", 
                             message: "Registrasi Mahasiswa Berhasil" 
                         });
                         connection.release();
                     });
+                });
+            });
+        });
+    });
+});
+
+// route buat register admin 
+app.post('/register-admin', [
+    body('username').notEmpty(),
+    body('password').isLength({ min: 8 }).withMessage('Password minimal 8 karakter'),
+    validate 
+], async (req, res) => {
+    const { username, password } = req.body;
+    const hashedPassword = bcrypt.hashSync(password, 10);
+
+    db.getConnection((err, connection) => {
+        if (err) return res.status(500).json({ 
+            status: "error", 
+            message: "Tidak bisa terhubung ke server, silakan coba lagi nanti" 
+        });
+
+        connection.beginTransaction(async (err) => {
+            if (err) return res.status(500).json({ 
+                status: "error", 
+                message: "Transaction ke database gagal" 
+            });
+
+            // Insert table users
+            const q1 = "INSERT INTO users (username, password, role) VALUES (?, ?, 'admin')";
+            connection.query(q1, [username, hashedPassword], (err, result) => {
+                if (err) {
+                    return connection.rollback(() => {
+                        connection.release();
+                        res.status(400).json({ 
+                            status: "error", 
+                            message: "Username sudah ada, silakan pilih username lain" });
+                    });
+                }
+
+                connection.commit((err) => {
+                    if (err) {
+                        return connection.rollback(() => {
+                            connection.release();
+                        });
+                    };
+                    res.status(201).json({ 
+                        status: "success", 
+                        message: "Registrasi Admin Berhasil" 
+                    });
+                    connection.release();
                 });
             });
         });
@@ -177,6 +232,12 @@ app.post('/login', [
 
         const user = results[0];
 
+        const payload = { 
+            id: user.id, 
+            username: user.username, 
+            role: user.role // otomatis di isi role"mahasiswa"
+        };
+
         // banding password
         const isMatch = bcrypt.compareSync(password, user.password);
         if (isMatch) {
@@ -202,31 +263,67 @@ app.post('/login', [
     });
 });
 
-// route buat lihat profil user sehabis login
-app.get('/profile', (req, res) => {
-    const userDataHeader = req.headers['x-user-data'];
-
-    if (!userDataHeader) {
-        return res.status(401).json({ 
+// API gateway proses request logout
+app.post('/logout', (req, res) => {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader) {
+        return res.status(401).json({
             status: "error",
-            message: "Akses ditolak. Informasi user tidak ditemukan"
-        });
-    }
+            message: "Token tidak ditemukan" })
+    };
+
+    const token = authHeader.split(' ')[1];
 
     try {
-        const user = JSON.parse(userDataHeader);
-        res.status(200).json({
-            status: "success",
-            message: "Profil berhasil dimuat",
-            user: user
+        const decoded = jwt.decode(token);
+        const expiry = new Date(decoded.exp * 1000).toISOString().slice(0, 19).replace('T', ' ');
+
+        const query = "INSERT INTO token_blacklist (token, expires_at) VALUES (?, ?)";
+        db.query(query, [token, expiry], (err) => {
+            if (err) {
+                if (err.code === 'ER_DUP_ENTRY') {
+                    return res.status(200).json({ 
+                        status: "success", 
+                        message: "User sudah logout" 
+                    });
+                }
+                return res.status(500).json({ 
+                    status: "error", 
+                    message: "Gagal memproses logout" 
+                });
+            }
+            
+            res.json({ 
+                status: "success", 
+                message: "Logout berhasil, token telah dinonaktifkan" 
+            });
         });
     } catch (error) {
-        res.status(400).json({
-            status: "error",
-            message: "Format data user tidak valid"
+        res.status(400).json({ 
+            status: "error", 
+            message: "Token tidak valid" 
         });
     }
-    
+});
+
+// route buat lihat profil user sehabis login
+app.get('/profile', (req, res) => {
+    const userData = req.headers['x-user-data'];
+
+    if (!userData) {
+        return res.status(401).json({ 
+            status: "error",
+            message: "Informasi user tidak ditemukan"
+        });
+    }
+
+    const user = JSON.parse(userData);
+
+    res.status(200).json({
+        status: "success",
+        message: "Profil berhasil dimuat",
+        user: user
+    });
 });
 
 app.listen(port, () => {
