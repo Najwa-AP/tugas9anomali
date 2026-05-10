@@ -43,7 +43,7 @@ Pastikan masuk ke dalam folder masing-masing sebelum eksekusi kode diatas untuk 
 ## **Daftar Endpoint yang Tersedia** 
 GET `http://localhost:4077/auth/profile` (akses profil setelah login)
 
-POST `http://localhost:4077/auth//refresh-token` (refresh bila tokennya udah basi)
+POST `http://localhost:4077/auth/refresh-token` (refresh bila tokennya udah basi)
 
 POST `http://localhost:4077/auth/register` (mendaftar sebagai user mahasiswa)
 
