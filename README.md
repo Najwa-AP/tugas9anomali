@@ -81,8 +81,8 @@ Response:
             "username": "admin_it",
             "role": "admin"
         },
-        "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9....",
-        "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp...."
+        "accessToken": "eyJhbGc.............................",
+        "refreshToken": "eyJhbGci............................"
     }
 }
 
