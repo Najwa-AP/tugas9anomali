@@ -43,6 +43,8 @@ Pastikan masuk ke dalam folder masing-masing sebelum eksekusi kode diatas untuk 
 ## **Daftar Endpoint yang Tersedia** 
 GET `http://localhost:4077/auth/profile` (akses profil setelah login)
 
+POST `http://localhost:4077/auth//refresh-token` (refresh bila tokennya udah basi)
+
 POST `http://localhost:4077/auth/register` (mendaftar sebagai user mahasiswa)
 
 POST `http://localhost:4077/auth/register-admin` (mendaftar sebagai user admin)
@@ -81,8 +83,8 @@ Response:
             "username": "admin_it",
             "role": "admin"
         },
-        "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9....",
-        "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp...."
+        "accessToken": "eyJhbG.............................",
+        "refreshToken": "eyJhbGc.............................."
     }
 }
 
